@@ -1,5 +1,0 @@
-- paths don't distinguish between connections (i.e. there is a change between two consecutive edges) or staying on the same train 
-  -> we need to consider the time it takes to change trains within the same stop.
-  -> we need to detect when such a change happens (as compared to staying on the train)
-  -> we need to remember not only the latest departure for each stop but all departures at most X minutes earlier than the latest departure, where X is the duration it takes to change at this location
-  
