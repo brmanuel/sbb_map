@@ -43,7 +43,7 @@ create table route (
        route_type int
 );
 
-\copy route from 'gtfs_data_2023/routes.txt' delimiter ',' csv header;
+\copy route from 'routes.txt' delimiter ',' csv header;
 
 create table stop (
        stop_id text primary key,
@@ -58,7 +58,7 @@ create table stop (
 -- need to use temporary table to convert "" to null
 create table stop_tmp as table stop limit 0;
 alter table stop_tmp alter column location_type type text;
-\copy stop_tmp from 'gtfs_data_2023/stops.txt' delimiter ',' csv header;
+\copy stop_tmp from 'stops.txt' delimiter ',' csv header;
 insert into stop select stop_id, stop_name, stop_lat, stop_lon, NULLIF(location_type, '')::int, NULLIF(parent_station, '') from stop_tmp;
 drop table stop_tmp;
 
@@ -76,7 +76,7 @@ create table calendar (
        end_date date
 );
 
-\copy calendar from 'gtfs_data_2023/calendar.txt' delimiter ',' csv header;
+\copy calendar from 'calendar.txt' delimiter ',' csv header;
 
 create table trip (
        route_id text references route (route_id),
@@ -88,7 +88,7 @@ create table trip (
        block_id text
 );
 
-\copy trip from 'gtfs_data_2023/trips.txt' delimiter ',' csv header;
+\copy trip from 'trips.txt' delimiter ',' csv header;
 
 create table stoptime (
        trip_id text references trip (trip_id),
@@ -105,7 +105,7 @@ create table stoptime_tmp as table stoptime limit 0;
 alter table stoptime_tmp alter column stop_sequence type text;
 alter table stoptime_tmp alter column pickup_type type text;
 alter table stoptime_tmp alter column dropoff_type type text;
-\copy stoptime_tmp from 'gtfs_data_2023/stop_times.txt' delimiter ',' csv header;
+\copy stoptime_tmp from 'stop_times.txt' delimiter ',' csv header;
 insert into stoptime select trip_id, arrival_time, departure_time, stop_id, NULLIF(stop_sequence, '')::int, NULLIF(pickup_type, '')::int, NULLIF(dropoff_type, '')::int from stoptime_tmp;
 ALTER TABLE stoptime ADD COLUMN id SERIAL PRIMARY KEY;
 
@@ -118,7 +118,7 @@ create table transfer (
        min_transfer_time integer
 );
 
-\copy transfer from 'gtfs_data_2023/transfers.txt' delimiter ',' csv header;
+\copy transfer from 'transfers.txt' delimiter ',' csv header;
 
 
 create function edges_on (dt date, start_time interval, end_time interval)

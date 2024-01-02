@@ -26,19 +26,61 @@ The implementation is generic - providing the following data should suffice to "
 
 ## How to run
 
-Needs to be cleaned-up. Documentation will follow.
-
 ### Get the necessary data
+
+The data source depends on the country. For Switzerland we can get the relevant data from
+- GTFS: [Open Transport Data](https://opentransportdata.swiss/dataset)
+- Geojson: [Datahub](https://datahub.io/cividi/ch-municipalities)
 
 ### Generate the database
 
+Setup a database and a database user if necessary. 
+You can use Postgres for instance, but any relational database will do. 
+For a postgres on Linux setup you can follow the [Arch Linux documentation](https://wiki.archlinux.org/title/PostgreSQL).
+
+After initial setup is done, create an empty database (see also the [documentation](https://www.postgresql.org/docs/current/sql-createdatabase.html))
+
+```sql
+CREATE DATABASE sbb_map WITH OWNER <user>;
+```
+
+Initialize the database using the GTFS data and the initialization script
+
+```bash
+# Inside the directory with the GTFS data
+psql -d sbb_map -U <user> -W -f ./<path-to-src>/init_db.sql -1
+```
+
+In order for python to be able to access the database we need to ensure that the correct environment variables are set. This is best achieved by using [direnv](https://direnv.net/).
+
+```bash
+# Inside the root directory of the project and after installing direnv
+direnv allow .
+echo "export DBUSER=<user>" > .envrc
+echo "export DBPASS=<password>" >> .envrc
+echo "export DBHOST=localhost" >> .envrc
+echo "export DBNAME=sbb_map" >> .envrc
+```
+
 ### Install the dependencies
 
+```bash
+python -m venv .env
+source .env/bin/activate
+pip install -r requirements.txt
+```
+
 ### Run the application
+
+```bash
+# Inside the root directory of the project with virtual environment enabled
+streamlit run main.py
+```
 
 
 ## TODOs
 
+- Streamline setup of application
 - Add [tooltip](https://stackoverflow.com/questions/70471888/text-as-tooltip-popup-or-labels-in-folium-choropleth-geojson-polygons) to the choropleth to get exact values for each municipality 
 - paths currently don't distinguish between connections (i.e. there is a change between two consecutive edges) or staying on the same train 
   - we need to consider the time it takes to change trains within the same stop.

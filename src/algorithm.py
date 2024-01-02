@@ -183,7 +183,7 @@ def main(location, datestr, timestr):
             mapping[id]["departure"] = f"{hours}:{minutes}:{seconds}"
         else:
             mapping[id]["departure"] = None
-    pprint(mapping)
+    print(json.dumps(mapping, indent=4))
     
 
 if __name__ == "__main__":
