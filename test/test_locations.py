@@ -1,4 +1,4 @@
-from algorithm import compute_map, parse_date, parse_time, print_time
+from src.traversal.algorithm import compute_map, parse_date, parse_time, print_time
 
 import pytest
 

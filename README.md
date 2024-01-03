@@ -32,6 +32,8 @@ The data source depends on the country. For Switzerland we can get the relevant 
 - GTFS: [Open Transport Data](https://opentransportdata.swiss/dataset)
 - Geojson: [Datahub](https://datahub.io/cividi/ch-municipalities)
 
+The code currently requires that each feature in the geojson file specifies an "id" in properties
+
 ### Generate the database
 
 Setup a database and a database user if necessary. 
@@ -82,6 +84,7 @@ streamlit run main.py
 
 - Streamline setup of application
 - Add [tooltip](https://stackoverflow.com/questions/70471888/text-as-tooltip-popup-or-labels-in-folium-choropleth-geojson-polygons) to the choropleth to get exact values for each municipality 
+- Allow for geojsons without properties.id
 - paths currently don't distinguish between connections (i.e. there is a change between two consecutive edges) or staying on the same train 
   - we need to consider the time it takes to change trains within the same stop.
   - we need to detect when such a change happens (as compared to staying on the train)

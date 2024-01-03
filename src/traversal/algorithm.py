@@ -1,10 +1,10 @@
 from sqlalchemy import create_engine, text
-from config import DATABASE_URI
-from datetime import date, timedelta
-from priority_queue import PriorityQueue
-from pprint import pprint
+import datetime
 import json
 import click
+
+from src.traversal.config import DATABASE_URI
+from src.traversal.priority_queue import PriorityQueue
 
 NEG_INFTY = -1
 
@@ -16,7 +16,7 @@ def parse_date(datestr):
     """
     Assumes datestr is given in format YYYY-MM-DD.
     """
-    dt = date.fromisoformat(datestr)
+    dt = datetime.date.fromisoformat(datestr)
     return dt
 
 def parse_time(timestr):
@@ -27,24 +27,19 @@ def parse_time(timestr):
     hh, mm = timestr.split(":")
     return 3600 * int(hh) + 60 * int(mm)
 
-def print_time(seconds):
-    hh = seconds // 3600
-    mm = (seconds % 3600) // 60
-    return f"{hh}:{mm}"
 
 def seconds_to_interval(seconds):
     """Database represents times as intervals."""
-    return timedelta(seconds=seconds)
+    return datetime.timedelta(seconds=seconds)
 
-def interval_to_seconds(interval : timedelta):
+def interval_to_seconds(interval : datetime.timedelta):
     """We represent times as integers in seconds after midnight."""
     return int(interval.total_seconds())
     
 
-def get_edges_in_timerange(date, start_time, end_time):
+def get_edges_in_timerange(date : datetime.date, start_time : int, end_time : int):
     '''
-    assumes date is given in format YYYY-MM-DD
-    and start_time, end_time are given in format hh:mm:ss
+    assumes start_time and end_time to be seconds since midnight
     '''
     print(f"Query edges: {start_time} - {end_time}")
     day = [
@@ -70,7 +65,7 @@ def get_edges_in_timerange(date, start_time, end_time):
     ]
     return edges
 
-def get_in_edges_in_timerange(date, start_time, end_time):
+def get_in_edges_in_timerange(date : datetime.date, start_time : int, end_time : int):
     in_edges = {}
     edges = get_edges_in_timerange(date, start_time, end_time)
     for src, dst, dep, arr in edges:
@@ -107,8 +102,14 @@ def get_locations():
     stops = conn.execute(stmt).fetchall()
     return stops
 
+def get_all_stop_names():
+    locations = get_locations()
+    return [
+        name for _, name, _, _ in locations
+    ]
 
-def traverse(location_dict, start_id, date, earliest_departure):
+
+def traverse(location_dict, start_id : str, date : datetime.date, earliest_departure : int):
     def update_neighbors(node):
         departure = location_dict[node]["departure"]
         for src, dep, arr in in_edges.get(node, []):
@@ -149,7 +150,19 @@ def traverse(location_dict, start_id, date, earliest_departure):
     return location_dict
 
 
-def compute_map(location, date, time, earliest_departure=0):
+def compute_map(location : str, date : datetime.date, time : int, earliest_departure : int = 0):
+    """Creates a mapping from stop_id to
+    {
+        "name": str - Name of the stop ("Zell (Wiesental), Wilder Mann"),
+        "lat": float - latitude of stop (47.710083),
+        "lon": float - longitude of stop (7.8596478),
+        "departure": datetime.time - latest possible departure (datetime.time(hour=12, minute=3)),
+        "pred": str - stop_id of the next stop on the shortest path to the destination ("1100417")
+    }
+    requires 
+    - location to be a stop_name of a stop in the database
+    - time to be given as seconds since midnight
+    """
     locations = get_locations()
     location_dict = {}
     start_id = None
@@ -163,6 +176,14 @@ def compute_map(location, date, time, earliest_departure=0):
         exit(1)
         
     traverse(location_dict, start_id, date, earliest_departure)
+    for stop_id in location_dict:
+        dep_in_seconds = location_dict[stop_id]["departure"]
+        if dep_in_seconds >= 0:
+            hours = dep_in_seconds // 3600
+            minutes = (dep_in_seconds % 3600) // 60
+            location_dict[stop_id]["departure"] = datetime.time(hour=hours, minute=minutes)
+        else:
+            location_dict[stop_id]["departure"] = None
     return location_dict
 
 
@@ -175,14 +196,9 @@ def main(location, datestr, timestr):
     time = parse_time(timestr)
     mapping = compute_map(location, date, time)
     for id in mapping.keys():
-        seconds = mapping[id]["departure"]
-        if seconds >= 0:
-            hours = seconds // 3600
-            minutes = (seconds % 3600) // 60
-            seconds = seconds % 60
-            mapping[id]["departure"] = f"{hours}:{minutes}:{seconds}"
-        else:
-            mapping[id]["departure"] = None
+        time = mapping[id]["departure"]
+        if time is not None:
+            mapping[id]["departure"] = "{:02d}:{:02d}".format(time.hour, time.minute)
     print(json.dumps(mapping, indent=4))
     
 
