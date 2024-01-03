@@ -60,6 +60,7 @@ In order for python to be able to access the database we need to ensure that the
 direnv allow .
 echo "export DBUSER=<user>" > .envrc
 echo "export DBPASS=<password>" >> .envrc
+echo "export DBPORT=5432" >> .envrc
 echo "export DBHOST=localhost" >> .envrc
 echo "export DBNAME=sbb_map" >> .envrc
 ```
