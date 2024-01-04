@@ -10,17 +10,30 @@ from src.choropleth.distance_choropleth import create_choropleth
 
 
 # The year of the gtfs data in the database
-YEAR=2023
+YEAR=2024
 GEOJSON = "data/geojson/ch-municipalities.geojson"
 
-def create_choropleth_folium(location : str, date : datetime.date, time : datetime.time):
+def create_choropleth_folium(location : str, date : datetime.date, time : datetime.time, earliest_departure : datetime.time):
     """
     Generate the map based on the current selection
     """
+
+    def parse_time(time : datetime.time):
+        if time is None:
+            return None
+        return time.minute + time.hour * 60
+    
+    def time_to_iso(time : datetime.time):
+        if time is None:
+            return "NA"
+        return time.isoformat()
+
+
     print(location, date, time)
 
     time_in_seconds = time.hour * 3600 + time.minute * 60
-    mapping = compute_map(location, date, time_in_seconds)
+    earliest_departure_in_seconds = earliest_departure.hour * 3600 + earliest_departure.minute * 60
+    mapping = compute_map(location, date, time_in_seconds, earliest_departure_in_seconds)
 
     print("computed map")
     coord_to_departure = {
@@ -32,37 +45,38 @@ def create_choropleth_folium(location : str, date : datetime.date, time : dateti
         geojson = json.load(f)
 
     choropleth = create_choropleth(coord_to_departure, geojson)
+    print(choropleth)
     data = pd.DataFrame({
         "id": choropleth.keys(),
-        "value": choropleth.values()
+        "value": map(parse_time, choropleth.values())
     })
     print("created choropleth")
-
-    # using dummy data for each of the 9760 municipalities
-    # municipalities = list(range(1, 9761))
-    # data = pd.DataFrame({
-    #     "id": municipalities,
-    #     "value": [random.randint(1, 8) for _ in municipalities]
-    # })
-    # data = pd.DataFrame({
-    #     "id": [4271, 4280, 4282, 4285, 4289],
-    #     "value": [1,2,3,4,5]
-    # })
 
     m = folium.Map(tiles="cartodb positron", location=(46.823673, 8.399077), zoom_start=8)
 
     # ch-municipalities.geojson is lower resolution than municipalities.geojson
-    folium.Choropleth(
-        geo_data=GEOJSON,
+    with open(GEOJSON, "r", encoding="utf-8") as f:
+        geojson = json.load(f)
+        for feature in geojson["features"]:
+            feature["properties"]["id"] = feature["id"]
+            feature["properties"]["departure"] = time_to_iso(choropleth[feature["id"]])
+
+    choropleth = folium.Choropleth(
+        geo_data=geojson,
         data=data,
         columns=["id", "value"],
-        key_on="feature.id",
+        key_on="feature.id"
     ).add_to(m)
+
+    choropleth.geojson.add_child(
+        folium.features.GeoJsonTooltip(["departure"])
+    )
 
     return m
 
 
 trainstations = get_all_stop_names()
+st.set_page_config(layout="wide")
 with st.sidebar.form("Selection", border=False):
     location = st.selectbox(
         label="Location", 
@@ -86,19 +100,25 @@ with st.sidebar.form("Selection", border=False):
         key="time",
         help="Specify the time before which you want to reach your destination."
     )
+
+    earliest_departure = st.time_input(
+        label="Earliest Departure",
+        value=datetime.time(0, 0),
+        key="earliest_departure",
+        help="Specify the earliest departure time."
+    )
     
     submitted = st.form_submit_button("Submit")
 
 
-m = create_choropleth_folium(location, date, time)
+m = create_choropleth_folium(location, date, time, earliest_departure)
 
 # streamlit-folium for integrating folium map with streamlit (https://folium.streamlit.app/)
 # folium_static seems to work fine for our use-case
 # st_folium allows bi-directional communication, but continuously reloaded the choropleth map
 # using st.pydeck_chart didn't work at all
-folium_static(m, width=1000, height=700)
+folium_static(m, width=1300, height=700)
 
-st.write("Querying:", location, date, time)
 
 
 

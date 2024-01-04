@@ -163,6 +163,7 @@ def compute_map(location : str, date : datetime.date, time : int, earliest_depar
     - location to be a stop_name of a stop in the database
     - time to be given as seconds since midnight
     """
+    print(f"compute_map({location}, {date}, {time})")
     locations = get_locations()
     location_dict = {}
     start_id = None

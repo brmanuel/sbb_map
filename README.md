@@ -9,6 +9,10 @@ A python streamlit app to visualize the "public-transportation distance" between
 Concretely, specifying a destination (a public transportation stop), a date, and a time a [choropleth map](https://datavizcatalogue.com/methods/choropleth.html) of the country is generated where each municipality is colored according to the latest departure time necessary to arrive in time at the specified destination.
 Different stops in the same municipality are aggregated by the minimum function.
 
+
+![Example](/images/screenshot_4_jan_zurich.png)
+The image above shows a screenshot from the app: In this example, we want to get to Zürich by 9 AM while limiting the departure time to be after 7:30 AM. Hovering over Aarau shows that from Aarau we need to leave by 8:23. Municipalities from which Zürich cannot be reached in time when leaving after 7:30 AM are shown in black.
+
 Granularity of aggregation depends on the "features" in the geojson data. E.g. given a geojson file containing a voronoi diagram of all public transportation stops in the country, there would be no aggregation at all.
 
 The implementation is generic - providing the following data should suffice to "port" the app to other countries

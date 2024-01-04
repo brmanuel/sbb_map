@@ -169,15 +169,17 @@ def test_rothrist_region():
 
     choropleth = create_choropleth(coord_to_departure, geojson)
     
+        
+    print({
+        id: print_time(val) for id, val in choropleth.items() if val is not None
+    })
+    
     # currently doesn't pass because "Oftringen, PerryCenter" is in Aarburg Polygon 
     check_choropleth_value(choropleth, "Aarburg")
     check_choropleth_value(choropleth, "Oftringen")
     check_choropleth_value(choropleth, "Rothrist")
     check_choropleth_value(choropleth, "Strengelbach")
     check_choropleth_value(choropleth, "Zofingen")
-    
-    print({
-        id: print_time(val) for id, val in choropleth.items() if val is not None
-    })
+
     assert False
 
