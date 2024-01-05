@@ -2,6 +2,7 @@
 from shapely import *
 import json
 import click
+import time
 
 SUBPROBLEM_LIMIT = 10000
 
@@ -25,85 +26,87 @@ def create_choropleth(coord_to_departure, geojson):
             return x
         return max(x,y)
 
+    choropleth = {}
 
-    def create_choropleth_rec(coords, features : GeometryCollection, bounds):
+    def create_choropleth_rec(
+        geometries_list, 
+        geometries_idxs, 
+        coords_list, 
+        coords_idxs, 
+        bounds
+    ):
+        nonlocal choropleth
+        
+        def partition_geometries_on_x_axis(feature_list, feature_idxs, x):
+            left = []
+            right = []
+            for idx in feature_idxs:
+                feature = feature_list[idx]
+                x_min, _, x_max, _ = feature.bounds
+                if x_min <= x:
+                    left.append(idx)
+                if x_max >= x:
+                    right.append(idx)
+            return left, right
+        
+        def partition_geometries_on_y_axis(feature_list, feature_idxs, y):
+            top = []
+            bottom = []
+            for idx in feature_idxs:
+                feature = feature_list[idx]
+                _, y_min, _, y_max = feature.bounds
+                if y_min <= y:
+                    bottom.append(idx)
+                if y_max >= y:
+                    top.append(idx)
+            return bottom, top
 
-        def partition_geometries_on_polytope(geometries, bounds):
-            x_min, y_min, x_max, y_max = bounds
-            polytope = Polygon([(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)])
-            inside = []
-            outside = []
-            for feature in geometries.geoms:
-                if polytope.contains(feature):
-                    inside.append(feature)
-                elif polytope.intersects(feature):
-                    inside.append(feature)
-                    outside.append(feature)
-                else:
-                    outside.append(feature)
-            return inside, outside
-
-        print("called with coords", len(coords.geoms), "and features", len(features.geoms))  
-        if len(coords.geoms) * len(features.geoms) < SUBPROBLEM_LIMIT:
-            choropleth = {}
-            # check inclusion of each coord in each feature
-            for p in coords.geoms:
+        print("called with coords", len(coords_idxs), "and features", len(geometries_idxs))  
+        if len(coords_idxs) * len(geometries_idxs) < SUBPROBLEM_LIMIT:
+            # Base case: check inclusion of each coord in each feature
+            for p_idx in coords_idxs:
+                p = coords_list[p_idx]
                 x, y = p.x, p.y
-                for geometry in features.geoms:
-                    if geometry.contains(Point(x,y)):
-                        if geometry not in choropleth:
-                            choropleth[geometry] = coord_to_departure[(x,y)]
-                        choropleth[geometry] = aggregate(
+                for geometry_idx in geometries_idxs:
+                    geometry = geometries_list[geometry_idx]
+                    if geometry.contains(p):
+                        choropleth[geometry_idx] = aggregate(
                             coord_to_departure[(x,y)],
-                            choropleth[geometry]
+                            choropleth.get(geometry_idx)
                         )
-            return choropleth
-        
-        # split both coords and features along one axis and solve the two resulting subproblems
-        x_min, y_min, x_max, y_max = bounds
-        if x_max - x_min > y_max - y_min:
-            x_half = (x_min + x_max) / 2
-            bounds1 = (x_min, y_min, x_half, y_max)
-            bounds2 = (x_half, y_min, x_max, y_max)
+                        break
         else:
-            y_half = (y_min + y_max) / 2
-            bounds1 = (x_min, y_min, x_max, y_half)
-            bounds2 = (x_min, y_half, x_max, y_max)
-        print(f"features are bounded by {bounds} splitting on {bounds1}")
-        coords1, coords2 = partition_geometries_on_polytope(coords, bounds1)
-        features1, features2 = partition_geometries_on_polytope(features, bounds1)
-
-        choropleth = create_choropleth_rec(GeometryCollection(coords1), GeometryCollection(features1), bounds1)
-        choropleth_other = create_choropleth_rec(GeometryCollection(coords2), GeometryCollection(features2), bounds2)
-        for geometry in choropleth_other:
-            if geometry in choropleth:
-                choropleth[geometry] = aggregate(
-                    choropleth[geometry],
-                    choropleth_other[geometry]
-                )
+            # Recursive case: split both coords and features along one axis and recurse
+            x_min, y_min, x_max, y_max = bounds
+            if x_max - x_min > y_max - y_min:
+                half = (x_min + x_max) / 2
+                bounds1 = (x_min, y_min, half, y_max)
+                bounds2 = (half, y_min, x_max, y_max)
+                coords_idxs1, coords_idxs2 = partition_geometries_on_x_axis(coords_list, coords_idxs, half)
+                geometries_idxs1, geometries_idxs2 = partition_geometries_on_x_axis(geometries_list, geometries_idxs, half)
             else:
-                choropleth[geometry] = choropleth_other[geometry]
-        
-        return choropleth
+                half = (y_min + y_max) / 2
+                bounds1 = (x_min, y_min, x_max, half)
+                bounds2 = (x_min, half, x_max, y_max)    
+                coords_idxs1, coords_idxs2 = partition_geometries_on_y_axis(coords_list, coords_idxs, half)
+                geometries_idxs1, geometries_idxs2 = partition_geometries_on_y_axis(geometries_list, geometries_idxs, half)
 
-    print("called")
+            create_choropleth_rec(geometries_list, geometries_idxs1, coords_list, coords_idxs1, bounds1)
+            create_choropleth_rec(geometries_list, geometries_idxs2, coords_list, coords_idxs2, bounds2)
+
     geometry_collection = from_geojson(json.dumps(geojson))
-    print("loaded geometry")
+
     assert geometry_collection.geom_type == "GeometryCollection"
     valid_geometries = GeometryCollection([
         geometry for geometry in geometry_collection.geoms
         if geometry.geom_type in ["Polygon", "MultiPolygon"]
     ])
-    print("filtered geometry")
+
     valid_coords = MultiPoint([[x,y] for x,y in coord_to_departure])
         
-    print("filtered coords")
-
     for geometry, feature in zip(valid_geometries.geoms, geojson["features"]):
         assert "id" in feature
         assert feature["geometry"]["type"] == geometry.geom_type
-
-    print("validated geometry and coords")
 
     geoms_bounds = valid_geometries.bounds
     coord_bounds = valid_coords.bounds
@@ -114,17 +117,21 @@ def create_choropleth(coord_to_departure, geojson):
         max(geoms_bounds[3], coord_bounds[3]),
     )
 
-    choropleth = create_choropleth_rec(valid_coords, valid_geometries, bounds)
+    geometries_list = list(valid_geometries.geoms)
+    coords_list = list(valid_coords.geoms)
+    geometries_idxs = list(range(len(geometries_list)))
+    coords_idxs = list(range(len(coords_list)))
+    create_choropleth_rec(geometries_list, geometries_idxs, coords_list, coords_idxs, bounds)
     return {
-        feature["id"]: choropleth.get(geometry)
-        for geometry, feature in zip(valid_geometries.geoms, geojson["features"])
+        feature["id"]: choropleth.get(idx)
+        for idx, feature in zip(geometries_idxs, geojson["features"])
     }
 
 
 @click.command()
 @click.argument("mapping_file")
 def main(mapping_file):
-    GEOJSON = "data/geojson/rothrist-municipalities.geojson"
+    GEOJSON = "data/geojson/ch-municipalities.geojson"
     with open(mapping_file, "r", encoding="utf-8") as f:
         mapping = json.load(f)
 

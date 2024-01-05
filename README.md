@@ -81,14 +81,13 @@ pip install -r requirements.txt
 
 ```bash
 # Inside the root directory of the project with virtual environment enabled
-streamlit run main.py
+python -m streamlit run main.py
 ```
 
 
 ## TODOs
 
 - Streamline setup of application
-- Add [tooltip](https://stackoverflow.com/questions/70471888/text-as-tooltip-popup-or-labels-in-folium-choropleth-geojson-polygons) to the choropleth to get exact values for each municipality 
 - Allow for geojsons without properties.id
 - paths currently don't distinguish between connections (i.e. there is a change between two consecutive edges) or staying on the same train 
   - we need to consider the time it takes to change trains within the same stop.

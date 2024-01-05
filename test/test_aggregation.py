@@ -3,91 +3,101 @@ import pytest
 
 from src.choropleth.distance_choropleth import create_choropleth
 
-coords = [
-    ["Aarburg, Alter Friedhof",47.326206,7.9005933,"14:30"],
-    ["Aarburg, Höhe",47.329163,7.9043303,"14:28"],
-    ["Aarburg, Kloosmatte",47.33682,7.9078603,"14:26"],
-    ["Aarburg, Längacker",47.333096,7.9062257,"14:27"],
-    ["Aarburg, Stadtgarten",47.320015,7.8994164,"14:31"],
-    ["Aarburg, Städtli",47.321762,7.898985,"14:31"],
-    ["Aarburg-Oftringen",47.32027,7.90822,"14:35"],
-    ["Aarburg-Oftringen",47.32027,7.90822,None],
-    ["Aarburg-Oftringen, Bahnhof",47.32015,7.9078155,"14:37"],
-    ["Oftringen, Baslerstrasse",47.314064,7.918218,"14:40"],
-    ["Oftringen, Bühnenberg-Sonnmatt",47.298832,7.9446645,"14:23"],
-    ["Oftringen, Döbeligut",47.296883,7.944988,"14:23"],
-    ["Oftringen, Eggenscheide",47.3169,7.9137535,"14:39"],
-    ["Oftringen, Gilam",47.303497,7.93684,"14:26"],
-    ["Oftringen, Kreuzplatz",47.31244,7.9206705,"14:42"],
-    ["Oftringen, Lerchenfeld",47.30077,7.9334173,"14:39"],
-    ["Oftringen, Neuquartier",47.314247,7.9224763,"14:31"],
-    ["Oftringen, Oberfeld",47.314785,7.9274077,"14:29"],
-    ["Oftringen, Obristhof",47.31622,7.9223504,"14:30"],
-    ["Oftringen, Perry-Center",47.311703,7.913511,"14:44"],
-    ["Oftringen, Ruhbank",47.29619,7.9365077,"14:38"],
-    ["Oftringen, Schulhaus/Kirche",47.311714,7.9297256,"14:28"],
-    ["Oftringen, Wirtshüsli",47.303772,7.931414,"14:40"],
-    ["Oftringen, alte Strasse",47.308987,7.9111843,"14:44"],
-    ["Oftringen,Kallernhag/Center A1",47.308346,7.926761,"14:41"],
-    ["Rothrist",47.306458,7.8793926,"15:00"],
-    ["Rothrist, Bahnhof",47.30615,7.8784947,"14:58"],
-    ["Rothrist, Breitenpark",47.306232,7.8865795,"14:53"],
-    ["Rothrist, Brunnhalde",47.300182,7.8774166,"14:44"],
-    ["Rothrist, Flecken",47.3061,7.903818,"14:46"],
-    ["Rothrist, Gemeindehaus",47.305264,7.8919783,"14:51"],
-    ["Rothrist, Gländ",47.295326,7.903683,"14:48"],
-    ["Rothrist, Grüebli",47.30269,7.877264,"14:45"],
-    ["Rothrist, Hungerzelg",47.29613,7.8582644,"14:39"],
-    ["Rothrist, Neue Industriestr.",47.30013,7.8667088,"14:40"],
-    ["Rothrist, Oberwil",47.298214,7.870221,"14:43"],
-    ["Rothrist, Rössli",47.30541,7.899452,"14:50"],
-    ["Rothrist, Schwimmbad",47.300407,7.9010243,"14:49"],
-    ["Rothrist, Sennhof-Dörfli",47.305588,7.888969,"14:52"],
-    ["Rothrist, Weier",47.2986,7.8738503,"14:43"],
-    ["Strengelbach, Bifang",47.280994,7.932672,"14:40"],
-    ["Strengelbach, Burgherr",47.275646,7.932079,"14:06"],
-    ["Strengelbach, Gemeindehaus",47.27826,7.929851,"14:39"],
-    ["Strengelbach, Hard",47.286285,7.929977,"14:12"],
-    ["Strengelbach, Hardmattenweg",47.282227,7.926375,"14:09"],
-    ["Strengelbach, Kath. Kirche",47.2806,7.9303093,"14:08"],
-    ["Strengelbach, Kreuzplatz",47.278736,7.9286385,"14:41"],
-    ["Strengelbach, Schleipfen",47.277588,7.9211016,"14:42"],
-    ["Strengelbach, Schürliweg",47.2857,7.932681,"14:13"],
-    ["Strengelbach, Seniorenzentrum",47.28035,7.927749,"14:09"],
-    ["Strengelbach, Sägetstrasse",47.28608,7.925683,"14:11"],
-    ["Zofingen",47.28805,7.9431195,"14:32"],
-    ["Zofingen",47.28805,7.9431195,None],
-    ["Zofingen, Ackerstrasse",47.297638,7.950629,"14:17"],
-    ["Zofingen, Altachen",47.278633,7.947036,"14:09"],
-    ["Zofingen, Bahnhof",47.28714,7.9441075,"14:35"],
-    ["Zofingen, Bahnhof",47.28714,7.9441075,"14:36"],
-    ["Zofingen, Bahnhofplatz",47.28817,7.9436493,"14:34"],
-    ["Zofingen, Bahnhofunterführung",47.28851,7.9424095,"14:30"],
-    ["Zofingen, Bergli Friedhof",47.280666,7.9580135,"14:29"],
-    ["Zofingen, Bethge",47.298588,7.9636726,"14:15"],
-    ["Zofingen, Bifangstrasse",47.291405,7.9444127,"14:21"],
-    ["Zofingen, Bleiche",47.293797,7.9331927,"07:59"],
-    ["Zofingen, Eisengrube",47.276333,7.9429846,"14:08"],
-    ["Zofingen, Falkeisenmatte",47.284523,7.940155,"14:38"],
-    ["Zofingen, Frikartstrasse",47.282665,7.945967,"14:11"],
-    ["Zofingen, Haldenweg",47.278496,7.957915,"14:26"],
-    ["Zofingen, Heitere Hirschpark",47.282635,7.958256,"14:31"],
-    ["Zofingen, Heitereplatz",47.28516,7.9569535,"14:32"],
-    ["Zofingen, Henzmannstrasse",47.287643,7.939445,"14:37"],
-    ["Zofingen, Industrie Brühl",47.294926,7.9301295,"07:59"],
-    ["Zofingen, JHCO",47.297325,7.957672,"14:16"],
-    ["Zofingen, Mühlethalstrasse",47.294785,7.9461107,"14:22"],
-    ["Zofingen, Mühlewiese",47.2825,7.937271,"14:39"],
-    ["Zofingen, Oberer Stadteingang",47.286053,7.9472785,"14:33"],
-    ["Zofingen, Riedtalstrasse",47.278435,7.951779,"14:25"],
-    ["Zofingen, Römerbad",47.282223,7.9487157,"14:24"],
-    ["Zofingen, Schwimmbad",47.27886,7.942652,"14:07"],
-    ["Zofingen, Spital",47.295475,7.947674,"14:18"],
-    ["Zofingen, Spitalgasse",47.291695,7.942697,"14:37"],
-    ["Zofingen, Tagblatt",47.28702,7.9366064,"14:14"],
-    ["Zofingen, Untere Brühlstrasse",47.28993,7.937523,"08:00"],
-    ["Zofingen, Wässermattenweg",47.291878,7.9345493,"08:00"],
-]
+coords = {
+    "Aarburg": [
+        ["Aarburg, Alter Friedhof",47.326206,7.9005933,"14:30"],
+        ["Aarburg, Höhe",47.329163,7.9043303,"14:28"],
+        ["Aarburg, Kloosmatte",47.33682,7.9078603,"14:26"],
+        ["Aarburg, Längacker",47.333096,7.9062257,"14:27"],
+        ["Aarburg, Stadtgarten",47.320015,7.8994164,"14:31"],
+        ["Aarburg, Städtli",47.321762,7.898985,"14:31"],
+        ["Aarburg-Oftringen",47.32027,7.90822,"14:35"],
+        ["Aarburg-Oftringen",47.32027,7.90822,None],
+        ["Aarburg-Oftringen, Bahnhof",47.32015,7.9078155,"14:37"],
+        ["Oftringen, Perry-Center",47.311703,7.913511,"14:44"], # this stop lies in the Aarburg feature of our geojson data.
+    ],
+    "Oftringen": [
+        ["Oftringen, Baslerstrasse",47.314064,7.918218,"14:40"],
+        ["Oftringen, Bühnenberg-Sonnmatt",47.298832,7.9446645,"14:23"],
+        ["Oftringen, Döbeligut",47.296883,7.944988,"14:23"],
+        ["Oftringen, Eggenscheide",47.3169,7.9137535,"14:39"],
+        ["Oftringen, Gilam",47.303497,7.93684,"14:26"],
+        ["Oftringen, Kreuzplatz",47.31244,7.9206705,"14:42"],
+        ["Oftringen, Lerchenfeld",47.30077,7.9334173,"14:39"],
+        ["Oftringen, Neuquartier",47.314247,7.9224763,"14:31"],
+        ["Oftringen, Oberfeld",47.314785,7.9274077,"14:29"],
+        ["Oftringen, Obristhof",47.31622,7.9223504,"14:30"],
+        ["Oftringen, Ruhbank",47.29619,7.9365077,"14:38"],
+        ["Oftringen, Schulhaus/Kirche",47.311714,7.9297256,"14:28"],
+        ["Oftringen, Wirtshüsli",47.303772,7.931414,"14:40"],
+        ["Oftringen, alte Strasse",47.308987,7.9111843,"14:44"],
+        ["Oftringen,Kallernhag/Center A1",47.308346,7.926761,"14:41"],
+    ],
+    "Rothrist": [
+        ["Rothrist",47.306458,7.8793926,"15:00"],
+        ["Rothrist, Bahnhof",47.30615,7.8784947,"14:58"],
+        ["Rothrist, Breitenpark",47.306232,7.8865795,"14:53"],
+        ["Rothrist, Brunnhalde",47.300182,7.8774166,"14:44"],
+        ["Rothrist, Flecken",47.3061,7.903818,"14:46"],
+        ["Rothrist, Gemeindehaus",47.305264,7.8919783,"14:51"],
+        ["Rothrist, Gländ",47.295326,7.903683,"14:48"],
+        ["Rothrist, Grüebli",47.30269,7.877264,"14:45"],
+        ["Rothrist, Hungerzelg",47.29613,7.8582644,"14:39"],
+        ["Rothrist, Neue Industriestr.",47.30013,7.8667088,"14:40"],
+        ["Rothrist, Oberwil",47.298214,7.870221,"14:43"],
+        ["Rothrist, Rössli",47.30541,7.899452,"14:50"],
+        ["Rothrist, Schwimmbad",47.300407,7.9010243,"14:49"],
+        ["Rothrist, Sennhof-Dörfli",47.305588,7.888969,"14:52"],
+        ["Rothrist, Weier",47.2986,7.8738503,"14:43"],
+    ],
+    "Strengelbach": [
+        ["Strengelbach, Bifang",47.280994,7.932672,"14:40"],
+        ["Strengelbach, Burgherr",47.275646,7.932079,"14:06"],
+        ["Strengelbach, Gemeindehaus",47.27826,7.929851,"14:39"],
+        ["Strengelbach, Hard",47.286285,7.929977,"14:12"],
+        ["Strengelbach, Hardmattenweg",47.282227,7.926375,"14:09"],
+        ["Strengelbach, Kath. Kirche",47.2806,7.9303093,"14:08"],
+        ["Strengelbach, Kreuzplatz",47.278736,7.9286385,"14:41"],
+        ["Strengelbach, Schleipfen",47.277588,7.9211016,"14:42"],
+        ["Strengelbach, Schürliweg",47.2857,7.932681,"14:13"],
+        ["Strengelbach, Seniorenzentrum",47.28035,7.927749,"14:09"],
+        ["Strengelbach, Sägetstrasse",47.28608,7.925683,"14:11"],
+    ],
+    "Zofingen": [
+        ["Zofingen",47.28805,7.9431195,"14:32"],
+        ["Zofingen",47.28805,7.9431195,None],
+        ["Zofingen, Ackerstrasse",47.297638,7.950629,"14:17"],
+        ["Zofingen, Altachen",47.278633,7.947036,"14:09"],
+        ["Zofingen, Bahnhof",47.28714,7.9441075,"14:35"],
+        ["Zofingen, Bahnhof",47.28714,7.9441075,"14:36"],
+        ["Zofingen, Bahnhofplatz",47.28817,7.9436493,"14:34"],
+        ["Zofingen, Bahnhofunterführung",47.28851,7.9424095,"14:30"],
+        ["Zofingen, Bergli Friedhof",47.280666,7.9580135,"14:29"],
+        ["Zofingen, Bethge",47.298588,7.9636726,"14:15"],
+        ["Zofingen, Bifangstrasse",47.291405,7.9444127,"14:21"],
+        ["Zofingen, Bleiche",47.293797,7.9331927,"07:59"],
+        ["Zofingen, Eisengrube",47.276333,7.9429846,"14:08"],
+        ["Zofingen, Falkeisenmatte",47.284523,7.940155,"14:38"],
+        ["Zofingen, Frikartstrasse",47.282665,7.945967,"14:11"],
+        ["Zofingen, Haldenweg",47.278496,7.957915,"14:26"],
+        ["Zofingen, Heitere Hirschpark",47.282635,7.958256,"14:31"],
+        ["Zofingen, Heitereplatz",47.28516,7.9569535,"14:32"],
+        ["Zofingen, Henzmannstrasse",47.287643,7.939445,"14:37"],
+        ["Zofingen, Industrie Brühl",47.294926,7.9301295,"07:59"],
+        ["Zofingen, JHCO",47.297325,7.957672,"14:16"],
+        ["Zofingen, Mühlethalstrasse",47.294785,7.9461107,"14:22"],
+        ["Zofingen, Mühlewiese",47.2825,7.937271,"14:39"],
+        ["Zofingen, Oberer Stadteingang",47.286053,7.9472785,"14:33"],
+        ["Zofingen, Riedtalstrasse",47.278435,7.951779,"14:25"],
+        ["Zofingen, Römerbad",47.282223,7.9487157,"14:24"],
+        ["Zofingen, Schwimmbad",47.27886,7.942652,"14:07"],
+        ["Zofingen, Spital",47.295475,7.947674,"14:18"],
+        ["Zofingen, Spitalgasse",47.291695,7.942697,"14:37"],
+        ["Zofingen, Tagblatt",47.28702,7.9366064,"14:14"],
+        ["Zofingen, Untere Brühlstrasse",47.28993,7.937523,"08:00"],
+        ["Zofingen, Wässermattenweg",47.291878,7.9345493,"08:00"],
+    ]
+}
 
 geojson = {
     "type":"FeatureCollection",
@@ -154,14 +164,15 @@ def test_rothrist_region():
     
     def check_choropleth_value(choropleth, id):
         expected = max(
-            parse_time(t) for p,_,_,t in coords 
-            if p.startswith(id) and t is not None
+            parse_time(t) for _,_,_,t in coords[id] 
+            if t is not None
         )
         assert choropleth[id] == expected, f"{print_time(choropleth[id])} (actual) == {print_time(expected)} (expected)"
     
     coord_to_departure = {
         (lon, lat): parse_time(dep)
-        for _, lat, lon, dep in coords
+        for place in coords
+        for _, lat, lon, dep in coords[place]
     }
 
     for feature in geojson["features"]:
@@ -180,6 +191,4 @@ def test_rothrist_region():
     check_choropleth_value(choropleth, "Rothrist")
     check_choropleth_value(choropleth, "Strengelbach")
     check_choropleth_value(choropleth, "Zofingen")
-
-    assert False
 
