@@ -1,82 +1,95 @@
 import datetime
 import streamlit as st
 import pandas as pd
-from streamlit_folium import folium_static
+from streamlit_folium import folium_static, st_folium
 import folium
 import json
 
 from src.traversal.algorithm import compute_map, get_all_stop_names
 from src.choropleth.distance_choropleth import create_choropleth
-
+from src.choropleth.geojson import Geojson
 
 # The year of the gtfs data in the database
 YEAR=2024
 GEOJSON = "data/geojson/ch-municipalities.geojson"
+st.set_page_config(layout="wide")
 
-def create_choropleth_folium(location : str, date : datetime.date, time : datetime.time, earliest_departure : datetime.time):
-    """
-    Generate the map based on the current selection
-    """
+def parse_time(time : datetime.time):
+    if time is None:
+        return None
+    return time.minute + time.hour * 60
 
-    def parse_time(time : datetime.time):
-        if time is None:
-            return None
-        return time.minute + time.hour * 60
+def time_to_iso(time : datetime.time):
+    if time is None:
+        return "NA"
+    return time.isoformat()
+
+@st.cache_data
+def get_geojson() -> Geojson:
+    with open(GEOJSON, "r", encoding="utf-8") as f:
+        geojson_data = json.load(f)
+        return Geojson(geojson_data)
+
+
+@st.cache_data
+def compute_choropleth(location : str, date : datetime.date, time : datetime.time, earliest_departure : datetime.time):
+    def aggregate_departures(departures, new_departure):
+        """Aggregate the departure times of coords in the same polygon."""
+        if new_departure is None:
+            return departures
+        updated_departures = departures
+        if departures is None:
+            updated_departures = []
+        updated_departures.append(new_departure)
+        return updated_departures
     
-    def time_to_iso(time : datetime.time):
-        if time is None:
-            return "NA"
-        return time.isoformat()
+    def get_latest_departure_time(stops):
+        if stops is None:
+            return None
+        departure_times = [
+            stop["departure"] for stop in stops 
+            if stop["departure"] is not None
+        ]
+        if len(departure_times) == 0:
+            return None
+        return max(departure_times)
 
-
-    print(location, date, time)
 
     time_in_seconds = time.hour * 3600 + time.minute * 60
     earliest_departure_in_seconds = earliest_departure.hour * 3600 + earliest_departure.minute * 60
     mapping = compute_map(location, date, time_in_seconds, earliest_departure_in_seconds)
-
-    print("computed map")
-    coord_to_departure = {
-        (val["lon"], val["lat"]): val["departure"]
+    coord_to_information = {
+        (val["lon"], val["lat"]): val
         for val in mapping.values()
     }
 
-    with open(GEOJSON, "r", encoding="utf-8") as f:
-        geojson = json.load(f)
+    geojson = get_geojson().get_geojson()
+    choropleth = create_choropleth(coord_to_information, geojson, aggregate=aggregate_departures)
 
-    choropleth = create_choropleth(coord_to_departure, geojson)
-    print(choropleth)
     data = pd.DataFrame({
         "id": choropleth.keys(),
-        "value": map(parse_time, choropleth.values())
+        "values": choropleth.values()
     })
-    print("created choropleth")
+    data["latest_departure_time"] = data["values"].map(get_latest_departure_time)
+    data["latest_departure_seconds"] = data["latest_departure_time"].map(parse_time)
+    data["latest_departure_string"] = data["latest_departure_time"].map(time_to_iso)
+    data.set_index("id", drop=False, inplace=True)
+    print(data)
 
-    m = folium.Map(tiles="cartodb positron", location=(46.823673, 8.399077), zoom_start=8)
+    for feature in geojson["features"]:
+        feature["properties"]["id"] = feature["id"]
+        feature["properties"]["departure"] = data.loc[feature["id"]]["latest_departure_string"]
 
-    # ch-municipalities.geojson is lower resolution than municipalities.geojson
-    with open(GEOJSON, "r", encoding="utf-8") as f:
-        geojson = json.load(f)
-        for feature in geojson["features"]:
-            feature["properties"]["id"] = feature["id"]
-            feature["properties"]["departure"] = time_to_iso(choropleth[feature["id"]])
-
-    choropleth = folium.Choropleth(
-        geo_data=geojson,
-        data=data,
-        columns=["id", "value"],
-        key_on="feature.id"
-    ).add_to(m)
-
-    choropleth.geojson.add_child(
-        folium.features.GeoJsonTooltip(["departure"])
-    )
-
-    return m
+    return data, geojson
 
 
-trainstations = get_all_stop_names()
-st.set_page_config(layout="wide")
+@st.cache_data
+def get_stop_names():
+    all_stop_names = get_all_stop_names()
+    return sorted(set(all_stop_names))
+
+
+trainstations = get_stop_names()
 with st.sidebar.form("Selection", border=False):
     location = st.selectbox(
         label="Location", 
@@ -111,13 +124,36 @@ with st.sidebar.form("Selection", border=False):
     submitted = st.form_submit_button("Submit")
 
 
-m = create_choropleth_folium(location, date, time, earliest_departure)
+print(location, date, time)
 
-# streamlit-folium for integrating folium map with streamlit (https://folium.streamlit.app/)
-# folium_static seems to work fine for our use-case
-# st_folium allows bi-directional communication, but continuously reloaded the choropleth map
-# using st.pydeck_chart didn't work at all
-folium_static(m, width=1300, height=700)
+m = folium.Map(tiles="cartodb positron", location=(46.823673, 8.399077), zoom_start=8)
+
+data, geojson_data = compute_choropleth(location, date, time, earliest_departure)
+choropleth = folium.Choropleth(
+    geo_data=geojson_data,
+    data=data,
+    columns=["id", "latest_departure_seconds"],
+    key_on="feature.id"
+).add_to(m)
+
+choropleth.geojson.add_child(
+    folium.features.GeoJsonTooltip(["departure"])
+)
+
+
+col1, col2 = st.columns([0.7, 0.3])
+with col1:
+    st_data = st_folium(m, width=900, height=600)
+
+with col2:
+    geojson = get_geojson()
+    last_clicked = st_data["last_clicked"]
+    if last_clicked is not None:
+        feature_clicked = geojson.get_feature_covering_lat_lon(last_clicked["lat"], last_clicked["lng"])
+        id = feature_clicked["id"]
+        d = pd.DataFrame(data.loc[id]["values"]).sort_values("departure", ascending=False)
+        st.write(d[["name", "departure"]])
+
 
 
 
