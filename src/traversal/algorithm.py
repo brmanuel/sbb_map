@@ -2,11 +2,14 @@ from sqlalchemy import create_engine, text
 import datetime
 import json
 import click
+import time
 
 from src.traversal.config import DATABASE_URI
 from src.traversal.priority_queue import PriorityQueue
 
 NEG_INFTY = -1
+SECONDS_TO_CHANGE = 120
+TRANSFER = "transfer"
 
 engine = create_engine(DATABASE_URI)
 conn = engine.connect()
@@ -49,7 +52,7 @@ def get_edges_in_timerange(date : datetime.date, start_time : int, end_time : in
     end_time_interval = seconds_to_interval(end_time)
     
     query = """
-    SELECT from_stop_id, to_stop_id, departure, arrival
+    SELECT from_stop_id, to_stop_id, departure, arrival, trip_id
     FROM edges
     WHERE departure >= INTERVAL '{}'
     AND departure <= INTERVAL '{}'
@@ -60,18 +63,21 @@ def get_edges_in_timerange(date : datetime.date, start_time : int, end_time : in
 
     stmt = text(query)
     edges = [
-        (src, dst, interval_to_seconds(dep), interval_to_seconds(arr))
-        for src, dst, dep, arr in conn.execute(stmt).fetchall()
+        (src, dst, interval_to_seconds(dep), interval_to_seconds(arr), trip_id)
+        for src, dst, dep, arr, trip_id in conn.execute(stmt).fetchall()
     ]
     return edges
 
 def get_in_edges_in_timerange(date : datetime.date, start_time : int, end_time : int):
+    start = time.time()
     in_edges = {}
     edges = get_edges_in_timerange(date, start_time, end_time)
-    for src, dst, dep, arr in edges:
+    for src, dst, dep, arr, trip_id in edges:
         if dst not in in_edges:
             in_edges[dst] = set()
-        in_edges[dst].add((src, dep, arr))
+        in_edges[dst].add((src, dep, arr, trip_id))
+    end = time.time()
+    print(f"Querying took {end - start} seconds")
     return in_edges
 
 def get_transfers():
@@ -112,18 +118,24 @@ def get_all_stop_names():
 def traverse(location_dict, start_id : str, date : datetime.date, earliest_departure : int):
     def update_neighbors(node):
         departure = location_dict[node]["departure"]
-        for src, dep, arr in in_edges.get(node, []):
-            if src not in fixed and src in location_dict and arr <= departure:
+        from_trip_id = location_dict[node]["trip_id"]
+        for src, dep, arr, to_trip_id in in_edges.get(node, []):
+            if src not in fixed and src in location_dict and (
+                (arr <= departure and from_trip_id in [to_trip_id, TRANSFER])
+                or (arr <= departure - SECONDS_TO_CHANGE)
+            ):
                 updated = q.update(src, dep)
                 if updated:
                     location_dict[src]["pred"] = node
                     location_dict[src]["departure"] = dep
+                    location_dict[src]["trip_id"] = to_trip_id
         for src, transfer_time in in_transfers.get(node, []):
             if src not in fixed and src in location_dict:
                 updated = q.update(src, departure-transfer_time)
                 if updated:
                     location_dict[src]["pred"] = node
                     location_dict[src]["departure"] = departure-transfer_time
+                    location_dict[src]["trip_id"] = TRANSFER
 
     q = PriorityQueue(lambda x: -x)
     fixed = set([start_id])
@@ -135,6 +147,9 @@ def traverse(location_dict, start_id : str, date : datetime.date, earliest_depar
     in_edges = get_in_edges_in_timerange(date, time_lb, time_ub)
     in_transfers = get_in_transfers()
     while q.size() > 0 and time_ub > earliest_departure:
+        # TODO: the traversal is naive in that it does not consider that changing
+        # the connection takes 2 minutes while staying on the same train does not
+        # require any changing time
         id, departure = q.peek()
         if departure == NEG_INFTY:
             time_lb = max(time_lb - time_increment, earliest_departure)
@@ -168,10 +183,11 @@ def compute_map(location : str, date : datetime.date, time : int, earliest_depar
     location_dict = {}
     start_id = None
     for id, name, lat, lon in locations:
-        location_dict[id] = {"name": name, "lat": lat, "lon": lon, "departure": NEG_INFTY, "pred": None}
+        location_dict[id] = {"name": name, "lat": lat, "lon": lon, "departure": NEG_INFTY, "pred": None, "trip_id": None}
         if name == location:
             start_id = id
             location_dict[id]["departure"] = time
+            location_dict[id]["trip_id"] = TRANSFER
     if start_id is None:
         print(f"Location {location} not in database. Exiting.")
         exit(1)

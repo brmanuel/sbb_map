@@ -35,8 +35,6 @@ def get_geojson() -> Geojson:
 def compute_choropleth(location : str, date : datetime.date, time : datetime.time, earliest_departure : datetime.time):
     def aggregate_departures(departures, new_departure):
         """Aggregate the departure times of coords in the same polygon."""
-        if new_departure is None:
-            return departures
         updated_departures = departures
         if departures is None:
             updated_departures = []
@@ -58,10 +56,19 @@ def compute_choropleth(location : str, date : datetime.date, time : datetime.tim
     time_in_seconds = time.hour * 3600 + time.minute * 60
     earliest_departure_in_seconds = earliest_departure.hour * 3600 + earliest_departure.minute * 60
     mapping = compute_map(location, date, time_in_seconds, earliest_departure_in_seconds)
-    coord_to_information = {
-        (val["lon"], val["lat"]): val
-        for val in mapping.values()
-    }
+    coord_to_information = {}
+    for id, val in mapping.items():
+        key = (val["lon"], val["lat"])
+        value = {"id": id, **val}
+        if key in coord_to_information:
+            # There are multiple stations at the same coordinates, take the one with the latest departure
+            other_value = coord_to_information[key]
+            if value["departure"] is None or (
+                other_value["departure"] is not None 
+                and value["departure"] < other_value["departure"]
+            ):
+                value = other_value
+        coord_to_information[key] = value
 
     geojson = get_geojson().get_geojson()
     choropleth = create_choropleth(coord_to_information, geojson, aggregate=aggregate_departures)
@@ -152,7 +159,7 @@ with col2:
         feature_clicked = geojson.get_feature_covering_lat_lon(last_clicked["lat"], last_clicked["lng"])
         id = feature_clicked["id"]
         d = pd.DataFrame(data.loc[id]["values"]).sort_values("departure", ascending=False)
-        st.write(d[["name", "departure"]])
+        st.write(d[["name", "departure", "id"]])
 
 
 

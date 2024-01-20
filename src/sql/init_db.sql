@@ -108,6 +108,12 @@ alter table stoptime_tmp alter column dropoff_type type text;
 \copy stoptime_tmp from 'stop_times.txt' delimiter ',' csv header;
 insert into stoptime select trip_id, arrival_time, departure_time, stop_id, NULLIF(stop_sequence, '')::int, NULLIF(pickup_type, '')::int, NULLIF(dropoff_type, '')::int from stoptime_tmp;
 ALTER TABLE stoptime ADD COLUMN id SERIAL PRIMARY KEY;
+ALTER TABLE stoptime ADD COLUMN rank INT;
+UPDATE stoptime s SET rank = t.rank from (
+       select id, rank() over (
+              partition by trip_id order by stop_sequence
+       ) from stoptime
+) as t where s.id = t.id;
 
 drop table stoptime_tmp;
 
@@ -121,41 +127,8 @@ create table transfer (
 \copy transfer from 'transfers.txt' delimiter ',' csv header;
 
 
-create function edges_on (dt date, start_time interval, end_time interval)
-returns table(from_stop_id text, to_stop_id text, departure interval, arrival interval, trip_id text) as $$
-	with active_stoptime as (
-	     select stoptime.trip_id,
-	     	    stoptime.arrival_time,
-		    stoptime.departure_time,
-		    stoptime.stop_id,
-		    stoptime.stop_sequence,
-		    stoptime.id
-	from (
-	     select trip.trip_id from trip join calendar
-	     on trip.service_id = calendar.service_id
-	     where calendar.start_date <= dt and dt <= calendar.end_date
-	     and (
-	     	 case extract(dow from dt::timestamp)
-		 when 0 then calendar.sunday
-		 when 1 then calendar.monday
-		 when 2 then calendar.tuesday
-		 when 3 then calendar.wednesday
-		 when 4 then calendar.thursday
-		 when 5 then calendar.friday
-		 when 6 then calendar.saturday
-		 end ) = 1
-	) as active_trip join stoptime on active_trip.trip_id = stoptime.trip_id
-	)
-	select lft.stop_id, rgt.stop_id, lft.departure_time, rgt.arrival_time, lft.trip_id
-	from active_stoptime lft join active_stoptime rgt
-	on lft.trip_id = rgt.trip_id and lft.stop_sequence + 1 = rgt.stop_sequence
-	where start_time <= lft.departure_time and rgt.arrival_time <= end_time;
-$$ language sql;
-
 create index trip_service_id on trip (service_id);
 create index stoptime_trip_id on stoptime (trip_id);
-
-
 
 create table edges (from_stop_id, to_stop_id, departure, arrival, trip_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date) as
        select lft.stop_id,
@@ -173,7 +146,7 @@ create table edges (from_stop_id, to_stop_id, departure, arrival, trip_id, monda
 	      cal.start_date,
 	      cal.end_date 
        from stoptime lft join stoptime rgt
-       on lft.trip_id = rgt.trip_id and lft.stop_sequence + 1 = rgt.stop_sequence join trip
+       on lft.trip_id = rgt.trip_id and lft.rank + 1 = rgt.rank join trip
        on lft.trip_id = trip.trip_id join calendar cal
        on trip.service_id = cal.service_id;
 
