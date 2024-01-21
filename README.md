@@ -8,12 +8,11 @@ A python streamlit app to visualize the "public-transportation distance" between
 
 Concretely, specifying a destination (a public transportation stop), a date, and a time a [choropleth map](https://datavizcatalogue.com/methods/choropleth.html) of the country is generated where each municipality is colored according to the latest departure time necessary to arrive in time at the specified destination.
 Different stops in the same municipality are aggregated by the minimum function.
-
-
-![Example](/images/screenshot_4_jan_zurich.png)
-The image above shows a screenshot from the app: In this example, we want to get to Zürich by 9 AM while limiting the departure time to be after 7:30 AM. Hovering over Aarau shows that from Aarau we need to leave by 8:23. Municipalities from which Zürich cannot be reached in time when leaving after 7:30 AM are shown in black.
-
 Granularity of aggregation depends on the "features" in the geojson data. E.g. given a geojson file containing a voronoi diagram of all public transportation stops in the country, there would be no aggregation at all.
+
+
+![Example](/images/screenshot_21_jan_wankdorf.png)
+The image above shows a screenshot from the app: In this example, we want to get to Bern, Wankdorf by 9:15 AM while limiting the departure time to be after 7:00 AM. Hovering over Zofingen shows that from Zofingen we need to leave by 8:32 to arrive on time. Municipalities from which Bern, Wankdorf cannot be reached in time when leaving after 7:00 AM are shown in black. Clicking on the polygon of the choropleth representing Zofingen, a list of stations is displayed on the right hand side of the map. This list contains all stops that lie within the polygon of Zofingen, together with their departure time. Selecting a stop in this list, another table appears below the first table, showing the itinerary to get from this stop to Bern, Wankdorf.
 
 The implementation is generic - providing the following data should suffice to "port" the app to other countries
 - [GTFS Data](https://developers.google.com/transit/gtfs/reference) about the public transportation of the country
@@ -86,13 +85,7 @@ python -m streamlit run main.py
 
 
 ## TODOs
-
-- Streamline setup of application
 - Allow for geojsons without properties.id
-- paths currently don't distinguish between connections (i.e. there is a change between two consecutive edges) or staying on the same train 
-  - we need to consider the time it takes to change trains within the same stop.
-  - we need to detect when such a change happens (as compared to staying on the train)
-  - we need to remember not only the latest departure for each stop but all departures at most X minutes earlier than the latest departure, where X is the duration it takes to change at this location
   
 
 ## Possible Extensions

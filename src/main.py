@@ -4,6 +4,7 @@ import pandas as pd
 from streamlit_folium import folium_static, st_folium
 import folium
 import json
+from itertools import groupby
 
 from src.traversal.algorithm import compute_map, get_all_stop_names
 from src.choropleth.distance_choropleth import create_choropleth
@@ -12,6 +13,7 @@ from src.choropleth.geojson import Geojson
 # The year of the gtfs data in the database
 YEAR=2024
 GEOJSON = "data/geojson/ch-municipalities.geojson"
+
 st.set_page_config(layout="wide")
 
 def parse_time(time : datetime.time):
@@ -87,7 +89,7 @@ def compute_choropleth(location : str, date : datetime.date, time : datetime.tim
         feature["properties"]["id"] = feature["id"]
         feature["properties"]["departure"] = data.loc[feature["id"]]["latest_departure_string"]
 
-    return data, geojson
+    return data, mapping, geojson
 
 
 @st.cache_data
@@ -97,6 +99,7 @@ def get_stop_names():
 
 
 trainstations = get_stop_names()
+st.header("Public Transport Map")
 with st.sidebar.form("Selection", border=False):
     location = st.selectbox(
         label="Location", 
@@ -135,7 +138,7 @@ print(location, date, time)
 
 m = folium.Map(tiles="cartodb positron", location=(46.823673, 8.399077), zoom_start=8)
 
-data, geojson_data = compute_choropleth(location, date, time, earliest_departure)
+data, mapping, geojson_data = compute_choropleth(location, date, time, earliest_departure)
 choropleth = folium.Choropleth(
     geo_data=geojson_data,
     data=data,
@@ -152,14 +155,52 @@ col1, col2 = st.columns([0.7, 0.3])
 with col1:
     st_data = st_folium(m, width=900, height=600)
 
+edited_df = None
 with col2:
     geojson = get_geojson()
     last_clicked = st_data["last_clicked"]
     if last_clicked is not None:
+        st.subheader("Stations")
         feature_clicked = geojson.get_feature_covering_lat_lon(last_clicked["lat"], last_clicked["lng"])
         id = feature_clicked["id"]
         d = pd.DataFrame(data.loc[id]["values"]).sort_values("departure", ascending=False)
-        st.write(d[["name", "departure", "id"]])
+        d["select_stop"] = False
+        edited_df = st.data_editor(
+            d[["name", "departure", "select_stop", "id"]], 
+            hide_index=True,
+            disabled=("departure", "name", "id"),
+            column_config={
+                "id": None
+            }
+        )
+
+    if edited_df is not None:
+        first_selected_row = edited_df.loc[edited_df["select_stop"]]
+        if len(first_selected_row) > 0:
+            st.subheader("Itinerary")
+            values = []
+            current_stop_id = first_selected_row.iloc[0]["id"]
+            while True:
+                value = mapping[current_stop_id]
+                values.append(value)
+                if value["name"] == location:
+                    break
+                current_stop_id = value["pred"]
+            table = []
+            groups = [(k, list(v)) for k,v in groupby(values, key=lambda v: v["trip_id"])]
+            for (trip_id1, grp1), (trip_id2, grp2) in zip(groups, groups[1:]):
+                type = "walk" if trip_id1 == "transfer" else "ride"
+                start = list(grp1)[0]
+                end = list(grp2)[0]
+                table.append({
+                    "departure": start["departure"],
+                    "from": start["name"],
+                    "type": type,
+                    "to": end["name"],
+                })
+
+            st.dataframe(pd.DataFrame(table), hide_index=True)
+
 
 
 
