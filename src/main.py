@@ -34,14 +34,19 @@ def get_geojson() -> Geojson:
 
 
 @st.cache_data
-def compute_choropleth(location : str, date : datetime.date, time : datetime.time, earliest_departure : datetime.time):
-    def aggregate_departures(departures, new_departure):
+def group_stops_by_feature(coord_to_stops, geojson):
+    def aggregate_stops(stops, new_stops):
         """Aggregate the departure times of coords in the same polygon."""
-        updated_departures = departures
-        if departures is None:
-            updated_departures = []
-        updated_departures.append(new_departure)
-        return updated_departures
+        updated_stops = stops or []
+        return updated_stops + new_stops
+    
+    geojson = get_geojson().get_geojson()
+    choropleth = create_choropleth(coord_to_stops, geojson, aggregate=aggregate_stops)
+    return choropleth
+
+
+@st.cache_data
+def compute_choropleth(location : str, date : datetime.date, time : datetime.time, earliest_departure : datetime.time):
     
     def get_latest_departure_time(stops):
         if stops is None:
@@ -57,27 +62,23 @@ def compute_choropleth(location : str, date : datetime.date, time : datetime.tim
 
     time_in_seconds = time.hour * 3600 + time.minute * 60
     earliest_departure_in_seconds = earliest_departure.hour * 3600 + earliest_departure.minute * 60
-    mapping = compute_map(location, date, time_in_seconds, earliest_departure_in_seconds)
-    coord_to_information = {}
-    for id, val in mapping.items():
+    stop_to_journey_information = compute_map(location, date, time_in_seconds, earliest_departure_in_seconds)
+    coord_to_stops = {}
+    for id,val in stop_to_journey_information.items():
         key = (val["lon"], val["lat"])
-        value = {"id": id, **val}
-        if key in coord_to_information:
-            # There are multiple stations at the same coordinates, take the one with the latest departure
-            other_value = coord_to_information[key]
-            if value["departure"] is None or (
-                other_value["departure"] is not None 
-                and value["departure"] < other_value["departure"]
-            ):
-                value = other_value
-        coord_to_information[key] = value
-
+        if key not in coord_to_stops:
+            coord_to_stops[key] = []
+        coord_to_stops[key].append(id)
+    
     geojson = get_geojson().get_geojson()
-    choropleth = create_choropleth(coord_to_information, geojson, aggregate=aggregate_departures)
+    feature_id_to_stops = group_stops_by_feature(coord_to_stops, geojson)
 
     data = pd.DataFrame({
-        "id": choropleth.keys(),
-        "values": choropleth.values()
+        "id": feature_id_to_stops.keys(),
+        "values": [
+            [{"id": stop_id, **stop_to_journey_information[stop_id]} for stop_id in (stop_ids or [])]
+            for stop_ids in feature_id_to_stops.values()
+        ]
     })
     data["latest_departure_time"] = data["values"].map(get_latest_departure_time)
     data["latest_departure_seconds"] = data["latest_departure_time"].map(parse_time)
@@ -89,7 +90,9 @@ def compute_choropleth(location : str, date : datetime.date, time : datetime.tim
         feature["properties"]["id"] = feature["id"]
         feature["properties"]["departure"] = data.loc[feature["id"]]["latest_departure_string"]
 
-    return data, mapping, geojson
+    return data, stop_to_journey_information, geojson
+
+
 
 
 @st.cache_data
@@ -162,17 +165,18 @@ with col2:
     if last_clicked is not None:
         st.subheader("Stations")
         feature_clicked = geojson.get_feature_covering_lat_lon(last_clicked["lat"], last_clicked["lng"])
-        id = feature_clicked["id"]
-        d = pd.DataFrame(data.loc[id]["values"]).sort_values("departure", ascending=False)
-        d["select_stop"] = False
-        edited_df = st.data_editor(
-            d[["name", "departure", "select_stop", "id"]], 
-            hide_index=True,
-            disabled=("departure", "name", "id"),
-            column_config={
-                "id": None
-            }
-        )
+        if feature_clicked is not None:
+            id = feature_clicked["id"]
+            d = pd.DataFrame(data.loc[id]["values"]).sort_values("departure", ascending=False)
+            d["select_stop"] = False
+            edited_df = st.data_editor(
+                d[["name", "departure", "select_stop", "id"]], 
+                hide_index=True,
+                disabled=("departure", "name", "id"),
+                column_config={
+                    "id": None
+                }
+            )
 
     if edited_df is not None:
         first_selected_row = edited_df.loc[edited_df["select_stop"]]
