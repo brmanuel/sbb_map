@@ -1,7 +1,7 @@
 import datetime
 import streamlit as st
 import pandas as pd
-from streamlit_folium import folium_static, st_folium
+from streamlit_folium import st_folium
 import folium
 import json
 from itertools import groupby
@@ -81,10 +81,9 @@ def compute_choropleth(location : str, date : datetime.date, time : datetime.tim
         ]
     })
     data["latest_departure_time"] = data["values"].map(get_latest_departure_time)
-    data["latest_departure_seconds"] = data["latest_departure_time"].map(parse_time)
+    data["latest_departure_minutes"] = data["latest_departure_time"].map(parse_time)
     data["latest_departure_string"] = data["latest_departure_time"].map(time_to_iso)
     data.set_index("id", drop=False, inplace=True)
-    print(data)
 
     for feature in geojson["features"]:
         feature["properties"]["id"] = feature["id"]
@@ -103,9 +102,16 @@ def get_stop_names():
 
 trainstations = get_stop_names()
 st.header("Public Transport Map")
+if "queries" not in st.session_state:
+    st.session_state["queries"] = set()
+
 with st.sidebar.form("Selection", border=False):
+    preset_location, preset_date, preset_time, preset_earliest_dep = st.session_state.get(
+        "last_query", (0 , datetime.date(YEAR, 1, 1), datetime.time(8, 45), datetime.time(0, 0))
+    )
     location = st.selectbox(
         label="Location", 
+        index=preset_location,
         options=trainstations,
         key="location",
         help="Select a destination. Start typing a trainstation name to narrow down the suggestions."
@@ -113,7 +119,7 @@ with st.sidebar.form("Selection", border=False):
 
     date = st.date_input(
         label="Date", 
-        value=datetime.date(YEAR, 1, 1),
+        value=preset_date,
         key="date",
         min_value=datetime.date(YEAR, 1, 1),
         max_value=datetime.date(YEAR, 12, 31),
@@ -122,19 +128,25 @@ with st.sidebar.form("Selection", border=False):
 
     time = st.time_input(
         label="Time",
-        value=datetime.time(8, 45),
+        value=preset_time,
         key="time",
         help="Specify the time before which you want to reach your destination."
     )
 
     earliest_departure = st.time_input(
         label="Earliest Departure",
-        value=datetime.time(0, 0),
+        value=preset_earliest_dep,
         key="earliest_departure",
         help="Specify the earliest departure time."
     )
     
     submitted = st.form_submit_button("Submit")
+    if submitted:
+        st.session_state["last_query"] = (trainstations.index(location), date, time, earliest_departure)
+        st.session_state["queries"].add((location, date, time, earliest_departure))
+
+    
+    
 
 
 print(location, date, time)
@@ -145,7 +157,7 @@ data, mapping, geojson_data = compute_choropleth(location, date, time, earliest_
 choropleth = folium.Choropleth(
     geo_data=geojson_data,
     data=data,
-    columns=["id", "latest_departure_seconds"],
+    columns=["id", "latest_departure_minutes"],
     key_on="feature.id"
 ).add_to(m)
 
