@@ -17,8 +17,42 @@ The image above shows a screenshot from the app: In this example, we want to get
 
 ### Accumulations
 Apart from the basic queries, the app allows computing accumulations of commutes.
+Consider the four queries and their result in the table below:
 
-<img src="/images/accum_altstetten.png" alt="Screenshot" style="height: 100px; width:100px;"/>
+<table>
+  <tr>
+    <td> 
+      <img src="/images/accum_altstetten.png" alt="Screenshot" style="height: 200px; width:350px;"/> 
+      <br/>
+      <span> Zürich Altstetten,	2024-01-15,	09:15:00,	07:00:00, 1 </span>
+    </td>
+    <td> 
+      <img src="/images/accum_zofingen.png" alt="Screenshot" style="height: 200px; width:350px;"/> 
+      <br/>
+      <span> Zofingen,	2024-01-20,	20:00:00,	18:00:00, 1 </span>
+    </td>
+  </tr>
+  <tr>
+    <td> 
+      <img src="/images/accum_wankdorf.png" alt="Screenshot" style="height: 200px; width:350px;"/> 
+      <br/>
+      <span> Bern Wankdorf,	2024-01-15,	09:15:00,	07:00:00, 1 </span>
+    </td>
+    <td> 
+      <img src="/images/accum_emmenbruecke.png" alt="Screenshot" style="height: 200px; width:350px;"/> 
+      <br/>
+      <span> Emmenbrücke,	2024-01-15,	09:00:00,	07:00:00, 4 </span>
+    </td>
+  </tr>
+</table>
+
+Each element in the table specifies the query as "Location, Date, Time, Earliest Departure, Multiplier".
+Summing up the commutes of all four queries, each multiplied by its multiplier results in the following accumulated map.
+Note that locations which cannot satisfy all four queries are black.
+
+![Example](/images/accum.png)
+
+In this map, each location is coloured according to the total commute time resulting from the four queries above.
 
 ### Porting the App to other Countries
 
