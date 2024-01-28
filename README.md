@@ -6,13 +6,21 @@
 
 A python streamlit app to visualize the "public-transportation distance" between different locations in switzerland.
 
-Concretely, specifying a destination (a public transportation stop), a date, and a time a [choropleth map](https://datavizcatalogue.com/methods/choropleth.html) of the country is generated where each municipality is colored according to the latest departure time necessary to arrive in time at the specified destination.
+### Basic Queries
+Specifying a destination (a public transportation stop), a date, and a time a [choropleth map](https://datavizcatalogue.com/methods/choropleth.html) of the country is generated where each municipality is colored according to the latest departure time necessary to arrive in time at the specified destination.
 Different stops in the same municipality are aggregated by the minimum function.
 Granularity of aggregation depends on the "features" in the geojson data. E.g. given a geojson file containing a voronoi diagram of all public transportation stops in the country, there would be no aggregation at all.
 
 
 ![Example](/images/screenshot_21_jan_wankdorf.png)
 The image above shows a screenshot from the app: In this example, we want to get to Bern, Wankdorf by 9:15 AM while limiting the departure time to be after 7:00 AM. Hovering over Zofingen shows that from Zofingen we need to leave by 8:32 to arrive on time. Municipalities from which Bern, Wankdorf cannot be reached in time when leaving after 7:00 AM are shown in black. Clicking on the polygon of the choropleth representing Zofingen, a list of stations is displayed on the right hand side of the map. This list contains all stops that lie within the polygon of Zofingen, together with their departure time. Selecting a stop in this list, another table appears below the first table, showing the itinerary to get from this stop to Bern, Wankdorf.
+
+### Accumulations
+Apart from the basic queries, the app allows computing accumulations of commutes.
+
+<img src="/images/accum_altstetten.png" alt="Screenshot" style="height: 100px; width:100px;"/>
+
+### Porting the App to other Countries
 
 The implementation is generic - providing the following data should suffice to "port" the app to other countries
 - [GTFS Data](https://developers.google.com/transit/gtfs/reference) about the public transportation of the country
