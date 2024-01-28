@@ -9,17 +9,13 @@ from itertools import groupby
 from src.traversal.algorithm import compute_map, get_all_stop_names
 from src.choropleth.distance_choropleth import create_choropleth
 from src.choropleth.geojson import Geojson
+from src.helpers.utils import parse_time
 
 # The year of the gtfs data in the database
 YEAR=2024
 GEOJSON = "data/geojson/ch-municipalities.geojson"
 
 st.set_page_config(layout="wide")
-
-def parse_time(time : datetime.time):
-    if time is None:
-        return None
-    return time.minute + time.hour * 60
 
 def time_to_iso(time : datetime.time):
     if time is None:
@@ -103,7 +99,7 @@ def get_stop_names():
 trainstations = get_stop_names()
 st.header("Public Transport Map")
 if "queries" not in st.session_state:
-    st.session_state["queries"] = set()
+    st.session_state["queries"] = {}
 
 with st.sidebar.form("Selection", border=False):
     preset_location, preset_date, preset_time, preset_earliest_dep = st.session_state.get(
@@ -141,13 +137,7 @@ with st.sidebar.form("Selection", border=False):
     )
     
     submitted = st.form_submit_button("Submit")
-    if submitted:
-        st.session_state["last_query"] = (trainstations.index(location), date, time, earliest_departure)
-        st.session_state["queries"].add((location, date, time, earliest_departure))
-
-    
-    
-
+ 
 
 print(location, date, time)
 
@@ -218,6 +208,8 @@ with col2:
             st.dataframe(pd.DataFrame(table), hide_index=True)
 
 
+st.session_state["last_query"] = (trainstations.index(location), date, time, earliest_departure)
+st.session_state["queries"][(location, date, time, earliest_departure)] = (data, mapping, geojson_data)
 
 
 

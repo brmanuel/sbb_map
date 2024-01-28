@@ -5,16 +5,15 @@ import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 
-from src.main import compute_choropleth, parse_time
-
+from src.helpers.utils import parse_time
 
 
 if "queries" not in st.session_state:
-    st.session_state["queries"] = set()
+    st.session_state["queries"] = {}
     
 
 queries = st.session_state["queries"]
-query_table = pd.DataFrame(queries, columns=["location", "date", "time", "earliest_departure"])
+query_table = pd.DataFrame(queries.keys(), columns=["location", "date", "time", "earliest_departure"])
 
 accumulation_table = None
 with st.sidebar.form("Accumulation", border=False):    
@@ -45,9 +44,9 @@ if accumulation_table is not None:
         for _, row in accumulation_table.iterrows():
             if row["count"] > 0:
                 print(f"Computing: {row['location']}, {row['date']}, {row['time']}, {row['earliest_departure']}")
-                data, _, geojson_data = compute_choropleth(
+                data, _, geojson_data = queries[(
                     row["location"], row["date"], row["time"], row["earliest_departure"]
-                )
+                )]
                 if accumulated_data is None:
                     accumulated_data = pd.DataFrame({"id": data["id"], "commute": 0})    
                 accumulated_data["commute"] += row["count"] * (parse_time(row["time"]) - data["latest_departure_minutes"])
